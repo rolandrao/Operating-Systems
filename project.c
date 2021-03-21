@@ -591,8 +591,8 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 
 
 	printf("time 0ms: Simulator started for SJF [Q <empty>]\n");
-	// while(tPs < nP){
-	while(time < 1000){
+	// while(time < 10000){
+	while(tPs < nP){
 		//checking if new processes have arrived
 		struct queue rQ;
 		rQ.size = 0;
@@ -639,10 +639,13 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 					}
 
 					if(q.readyQueue[i].csT <= 0) {
-						tPs++;
-						q.readyQueue[i].state = "TERMINATED";
-					}else{
-						q.readyQueue[i].state = "IO";
+						if(q.readyQueue[i].burstNum >= q.readyQueue[i].size){
+							tPs++;
+							q.readyQueue[i].state = "TERMINATED";
+						}
+						else{
+							q.readyQueue[i].state = "IO";
+						}
 					}
 				}
 
@@ -671,6 +674,8 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 								q.readyQueue[i].csT = cS;
 							}
 
+							q.readyQueue[i].csT = cS/2;
+
 
 							q.readyQueue[i].cpuB = q.readyQueue[i].cpuBtimes[q.readyQueue[i].burstNum];
 							q.readyQueue[i].ioB = q.readyQueue[i].ioBtimes[q.readyQueue[i].burstNum];
@@ -694,7 +699,6 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 
 					if(q.readyQueue[i].csT <= 0){
 						q.readyQueue[i].state = "CPU";
-
 						printf("time %dms: Process %c started using the CPU for %dms burst ", time, q.readyQueue[i].id, q.readyQueue[i].cpuB);
 						printQ(rQ);
 					}
@@ -736,7 +740,7 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 
 						if(!cpuInUse){
 							q.readyQueue[i].state = "csIn";
-							if(rQ.size == 1 && strcmp(q.readyQueue[0].state, "csOut") == 0){
+							if(rQ.size == 1 && strcmp(q.readyQueue[0].state, "csOut") != 0){
 								q.readyQueue[i].csT = (cS/2);
 							}else{
 								q.readyQueue[i].csT = cS;
@@ -744,7 +748,7 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 
 							cpuInUse = true;
 							contextSwitches++;
-							q.readyQueue[0].turnT += (cS/2);
+							q.readyQueue[i].turnT += (cS/2);
 							popQ(&rQ, 0);
 						}else{
 							q.readyQueue[i].state = "READY";
@@ -755,7 +759,7 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 		}
 		reorganizeQ(&q, 1);
 
-		if(tPs == nP){
+		if(tPs >= nP){
 			printf("time %dms: Simulator ended for SJF ", time);
 			printQ(rQ);
 			break;
