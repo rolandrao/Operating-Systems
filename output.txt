@@ -1,4 +1,53 @@
-{8}{2}{8.880}{0}{you're a 6}
-{3.10}
-{8}{2}{8.880}{16788}{square 8}
-{0.00}
+Process A [NEW] (arrival time 9 ms) 16 CPU bursts (tau 100ms)
+Process B [NEW] (arrival time 18 ms) 21 CPU bursts (tau 100ms)
+Process C [NEW] (arrival time 42 ms) 4 CPU bursts (tau 100ms)
+Process D [NEW] (arrival time 156 ms) 11 CPU bursts (tau 100ms)
+Process E [NEW] (arrival time 134 ms) 55 CPU bursts (tau 100ms)
+Process F [NEW] (arrival time 106 ms) 34 CPU bursts (tau 100ms)
+Process G [NEW] (arrival time 65 ms) 80 CPU bursts (tau 100ms)
+Process H [NEW] (arrival time 11 ms) 83 CPU bursts (tau 100ms)
+Process I [NEW] (arrival time 68 ms) 77 CPU bursts (tau 100ms)
+Process J [NEW] (arrival time 0 ms) 10 CPU bursts (tau 100ms)
+Process K [NEW] (arrival time 7 ms) 13 CPU bursts (tau 100ms)
+Process L [NEW] (arrival time 189 ms) 7 CPU bursts (tau 100ms)
+Process M [NEW] (arrival time 16 ms) 48 CPU bursts (tau 100ms)
+Process N [NEW] (arrival time 122 ms) 31 CPU bursts (tau 100ms)
+Process O [NEW] (arrival time 29 ms) 31 CPU bursts (tau 100ms)
+Process P [NEW] (arrival time 159 ms) 16 CPU bursts (tau 100ms)
+time 0ms: Simulator started for SJF [Q <empty>]
+time 0ms: Process J (tau 100ms) arrived; placed on ready queue [Q J]
+time 2ms: Process J (tau 100ms) started using the CPU for 40ms burst [Q <empty>]
+time 7ms: Process K (tau 100ms) arrived; placed on ready queue [Q K]
+time 9ms: Process A (tau 100ms) arrived; placed on ready queue [Q A K]
+time 11ms: Process H (tau 100ms) arrived; placed on ready queue [Q A H K]
+time 16ms: Process M (tau 100ms) arrived; placed on ready queue [Q A H K M]
+time 18ms: Process B (tau 100ms) arrived; placed on ready queue [Q A B H K M]
+time 29ms: Process O (tau 100ms) arrived; placed on ready queue [Q A B H K M O]
+time 42ms: Process J (tau 100ms) completed a CPU burst; 9 bursts to go [Q A B H K M O]
+time 42ms: Recalculated tau (55ms) for process J [Q A B H K M O]
+time 42ms: Process J switching out of CPU; will block on I/O until time 74ms [Q A B H K M O]
+time 42ms: Process C (tau 100ms) arrived; placed on ready queue [Q A B C H K M O]
+time 46ms: Process A (tau 100ms) started using the CPU for 56ms burst [Q B C H K M O]
+time 65ms: Process G (tau 100ms) arrived; placed on ready queue [Q B C G H K M O]
+time 68ms: Process I (tau 100ms) arrived; placed on ready queue [Q B C G H I K M O]
+time 102ms: Process A (tau 100ms) completed a CPU burst; 15 bursts to go [Q B C G H I K M O]
+time 102ms: Recalculated tau (67ms) for process A [Q B C G H I K M O]
+time 102ms: Process A switching out of CPU; will block on I/O until time 334ms [Q B C G H I K M O]
+time 106ms: Process B (tau 100ms) started using the CPU for 106ms burst [Q C G H I K M O]
+time 106ms: Process F (tau 100ms) arrived; placed on ready queue [Q C F G H I K M O]
+time 122ms: Process N (tau 100ms) arrived; placed on ready queue [Q C F G H I K M N O]
+time 134ms: Process E (tau 100ms) arrived; placed on ready queue [Q C E F G H I K M N O]
+time 156ms: Process D (tau 100ms) arrived; placed on ready queue [Q C D E F G H I K M N O]
+time 159ms: Process P (tau 100ms) arrived; placed on ready queue [Q C D E F G H I K M N O P]
+time 189ms: Process L (tau 100ms) arrived; placed on ready queue [Q C D E F G H I K L M N O P]
+time 212ms: Process B (tau 100ms) completed a CPU burst; 20 bursts to go [Q C D E F G H I K L M N O P]
+time 212ms: Recalculated tau (105ms) for process B [Q C D E F G H I K L M N O P]
+time 212ms: Process B switching out of CPU; will block on I/O until time 1774ms [Q C D E F G H I K L M N O P]
+time 216ms: Process C (tau 100ms) started using the CPU for 94ms burst [Q D E F G H I K L M N O P]
+time 310ms: Process C (tau 100ms) completed a CPU burst; 3 bursts to go [Q D E F G H I K L M N O P]
+time 310ms: Recalculated tau (96ms) for process C [Q D E F G H I K L M N O P]
+time 310ms: Process C switching out of CPU; will block on I/O until time 1892ms [Q D E F G H I K L M N O P]
+time 314ms: Process D (tau 100ms) started using the CPU for 148ms burst [Q E F G H I K L M N O P]
+time 462ms: Process D (tau 100ms) completed a CPU burst; 10 bursts to go [Q E F G H I K L M N O P]
+time 462ms: Recalculated tau (136ms) for process D [Q E F G H I K L M N O P]
+time 462ms: Proce

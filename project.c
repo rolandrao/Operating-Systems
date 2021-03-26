@@ -49,20 +49,21 @@ struct sim
 };
 
 //Prototype functions
-struct process generator(double l, int uB);
+struct process generator(double l, int uB, int tau_i);
 void resetProcessor(struct process* pA, int nP);
 struct sim FCFS(struct process* pA, int nP, int cS);
 struct sim RR(struct process* pA, int nP, int cS, int tS);
-void SJF(struct process* pA, int nP, int cS, double alpha);
+struct sim SJF(struct process* pA, int nP, int cS, double alpha);
 int exp_avg(int tau, int t, double alpha);
 
 //Prototype functions for the queue
 int sortingP(struct process p1, struct process p2);
+int sorting_SJF(struct process p1, struct process p2);
 void printQ(struct queue qu);
 void pushQ(struct queue * q, struct process p );
 void popQ(struct queue * q, int index);
 void insertQ(struct queue * q, struct process p);
-struct process frontQ(struct queue * q);
+void tie_breaker(struct queue * q);
 void reorganizeQ(struct queue * q, int alg);
 
 
@@ -73,7 +74,8 @@ int main(int argc, char const *argv[])
 	double lambda = atof(argv[3]);	//Lambda
 	int upperBound = atoi(argv[4]);	//UpperBounds for valid pseudo-random numbers
 	int tCS = atoi(argv[5]);		//Time(ms) for Context Switch
-	int alpha = atof(argv[6]);		//constant α, (Used for SJF and SRT alg.)
+	double alpha = atof(argv[6]);		//constant α, (Used for SJF and SRT alg.)
+	int tau_i = 1/lambda;
 
 	/*
 	int tSlice = argv[7];		//Time Slice(ms) for RR alg.
@@ -88,7 +90,7 @@ int main(int argc, char const *argv[])
 	for (int i = 0; i < numOfP; ++i)
 	{
 		struct process p;
-		p = generator(lambda, upperBound);
+		p = generator(lambda, upperBound, tau_i);
 		p.id = (char)('A'+ i);
 
 		pArray[i] = p;
@@ -156,7 +158,7 @@ int main(int argc, char const *argv[])
 	#endif
 
 	// struct sim fcfs_val = FCFS(pArray, numOfP, tCS);
-	SJF(pArray, numOfP, tCS, alpha);
+	struct sim sjf_val = SJF(pArray, numOfP, tCS, alpha);
 
 	// printf("Algorithm FCFS\n");
 	// printf("-- average CPU burst time: %.03f ms\n", fcfs_val.avg_CPUbt);
@@ -165,6 +167,14 @@ int main(int argc, char const *argv[])
 	// printf("-- total number of context switches: %d\n", fcfs_val.numOfCS);
 	// printf("-- total number of preemptions: 0\n");
 	// printf("-- CPU utilization: %.03f%c\n", fcfs_val.cpuUsePer, '%');
+
+	printf("Algorithm SJF\n");
+	printf("-- average CPU burst time: %.03f ms\n", sjf_val.avg_CPUbt);
+	printf("-- average wait time:  %.03f ms\n", sjf_val.avg_Wt);
+	printf("-- average turnaround time:  %.03f ms\n", sjf_val.avg_Tt);
+	printf("-- total number of context switches: %d\n", sjf_val.numOfCS);
+	printf("-- total number of preemptions: 0\n");
+	printf("-- CPU utilization: %.03f%c\n", sjf_val.cpuUsePer, '%');
 
 	/*
 	char * name = "outfile.txt";
@@ -181,7 +191,7 @@ int main(int argc, char const *argv[])
 }
 
 
-struct process generator(double l, int uB)
+struct process generator(double l, int uB, int tau_i)
 {
 	struct process p;
 	double r; 	//random number
@@ -240,6 +250,7 @@ struct process generator(double l, int uB)
 
 	p.cpuBtimes = cpuBurstTimes;
 	p.ioBtimes = ioBurstTimes;
+	p.tau = tau_i;
 
 	return p;
 }
@@ -560,7 +571,7 @@ struct sim FCFS(struct process* pA, int nP, int cS)
 // }
 
 
-void SJF(struct process* pA, int nP, int cS, double alpha)
+struct sim SJF(struct process* pA, int nP, int cS, double alpha)
 {
 	struct queue q;
 	q.size = 0;
@@ -570,6 +581,7 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 	int tPs = 0;
 	int time = 0;
 	bool cpuInUse = false;
+	//bool newcsIn = false;
 	int totalCPU_BurstNum = 0;
 	int totalTurnt_Sum = 0;
 	int totalWaitTime = 0;
@@ -585,27 +597,30 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 
 		pushQ(&q, pA[i]);
 
-		printf("Process %c [NEW] (arrvial time %d ms) %d CPU burst%s\n", pA[i].id, pA[i].arrivalTime, pA[i].size, (pA[i].size == 1) ? "" : "s");
-		reorganizeQ(&q, 1);
+		printf("Process %c [NEW] (arrival time %d ms) %d CPU burst%s (tau %dms)\n", pA[i].id, pA[i].arrivalTime, pA[i].size, (pA[i].size == 1) ? "" : "s", pA[i].tau);
+
 	}
+	reorganizeQ(&q, 0);
+	reorganizeQ(&q, 1);
 
 
 	printf("time 0ms: Simulator started for SJF [Q <empty>]\n");
 	// while(time < 10000){
 	while(tPs < nP){
 		//checking if new processes have arrived
+		//newcsIn = false;
 		struct queue rQ;
 		rQ.size = 0;
 		for(int i = 0; i < q.size; ++i){
 			if((strcmp(q.readyQueue[i].state, "READY") == 0) || (strcmp(q.readyQueue[i].state, "csIn") == 0)){
-				insertQ(&rQ, q.readyQueue[i]);
+				pushQ(&rQ, q.readyQueue[i]);
 			}
 		}
 
 		for(int i = 0; i < q.size; ++i){
 			if(time == 0){
 				if(strcmp(q.readyQueue[i].state, "READY") == 0){
-					printf("time %dms: Process %c arrived; placed on ready queue ", time, q.readyQueue[i].id);
+					printf("time %dms: Process %c (tau %dms) arrived; placed on ready queue ", time, q.readyQueue[i].id, q.readyQueue[i].tau);
 					printQ(rQ);
 
 					if(!cpuInUse){
@@ -626,30 +641,9 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 			}
 
 			if(time > 0){
-				if(strcmp(q.readyQueue[i].state, "csOut") == 0){
-					q.readyQueue[i].csT--;
 
-					if((cS/2) < q.readyQueue[i].csT){
-						tPs++;
-						if(tPs == nP && q.readyQueue[i].burstNum >= q.readyQueue[i].size) {
-							break;
-						}else{
-							tPs--;
-						}
-					}
 
-					if(q.readyQueue[i].csT <= 0) {
-						if(q.readyQueue[i].burstNum >= q.readyQueue[i].size){
-							tPs++;
-							q.readyQueue[i].state = "TERMINATED";
-						}
-						else{
-							q.readyQueue[i].state = "IO";
-						}
-					}
-				}
-
-				else if(strcmp(q.readyQueue[i].state, "CPU") == 0){
+				if(strcmp(q.readyQueue[i].state, "CPU") == 0){
 					q.readyQueue[i].cpuB--;
 					q.readyQueue[i].turnT++;
 					cpuUtilization++;
@@ -681,7 +675,14 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 							q.readyQueue[i].ioB = q.readyQueue[i].ioBtimes[q.readyQueue[i].burstNum];
 
 							int bursts = q.readyQueue[i].size - q.readyQueue[i].burstNum;
-							printf("time %dms: Process %c completed a CPU burst; %d burst%s to go ", time, q.readyQueue[i].id, bursts, (bursts == 1) ? "" : "s");
+							printf("time %dms: Process %c (tau %dms) completed a CPU burst; %d burst%s to go ", time, q.readyQueue[i].id, q.readyQueue[i].tau, bursts, (bursts == 1) ? "" : "s");
+							printQ(rQ);
+
+							int tau = q.readyQueue[i].tau;
+							int t = q.readyQueue[i].cpuBtimes[q.readyQueue[i].burstNum-1];
+
+							q.readyQueue[i].tau = exp_avg(tau, t, alpha);
+							printf("time %dms: Recalculated tau (%dms) for process %c ", time, q.readyQueue[i].tau, q.readyQueue[i].id);
 							printQ(rQ);
 
 							printf("time %dms: Process %c switching out of CPU; will block on I/O until time %dms ",
@@ -699,7 +700,7 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 
 					if(q.readyQueue[i].csT <= 0){
 						q.readyQueue[i].state = "CPU";
-						printf("time %dms: Process %c started using the CPU for %dms burst ", time, q.readyQueue[i].id, q.readyQueue[i].cpuB);
+						printf("time %dms: Process %c (tau %dms) started using the CPU for %dms burst ", time, q.readyQueue[i].id, q.readyQueue[i].tau, q.readyQueue[i].cpuB);
 						printQ(rQ);
 					}
 				}
@@ -710,6 +711,7 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 
 					if(!cpuInUse){
 						q.readyQueue[i].state = "csIn";
+						//newcsIn = true;
 						if(i == 0){
 							q.readyQueue[i].csT = (cS/2);
 						}else{
@@ -729,17 +731,17 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 					if(q.readyQueue[i].ioB <= 0){
 						q.readyQueue[i].turnT = 0;
 						q.readyQueue[i].waitT = 0;
-
-						pushQ(&rQ, q.readyQueue[i]);
+						insertQ(&rQ, q.readyQueue[i]);
 						if(q.readyQueue[i].burstNum == 0){
-							printf("time %dms: Process %c arrived; placed on ready queue ", time, q.readyQueue[i].id);
+							printf("time %dms: Process %c (tau %dms) arrived; placed on ready queue ", time, q.readyQueue[i].id, q.readyQueue[i].tau);
 						}else{
-							printf("time %dms: Process %c completed I/O; placed on ready queue ", time, q.readyQueue[i].id);
+							printf("time %dms: Process %c (tau %dms) completed I/O; placed on ready queue ", time, q.readyQueue[i].id, q.readyQueue[i].tau);
 						}
 						printQ(rQ);
-
+						q.readyQueue[i].state = "READY";
 						if(!cpuInUse){
 							q.readyQueue[i].state = "csIn";
+							//newcsIn = true;
 							if(rQ.size == 1 && strcmp(q.readyQueue[0].state, "csOut") != 0){
 								q.readyQueue[i].csT = (cS/2);
 							}else{
@@ -750,13 +752,69 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 							contextSwitches++;
 							q.readyQueue[i].turnT += (cS/2);
 							popQ(&rQ, 0);
-						}else{
-							q.readyQueue[i].state = "READY";
 						}
 					}
-				}
+					else if(strcmp(q.readyQueue[i].state, "csOut") == 0){
+						printf("inside csOut\n");
+						q.readyQueue[i].csT--;
+
+						if((cS/2) < q.readyQueue[i].csT){
+							tPs++;
+							if(tPs == nP && q.readyQueue[i].burstNum >= q.readyQueue[i].size) {
+								break;
+							}else{
+								tPs--;
+							}
+						}
+
+						if(q.readyQueue[i].csT <= 0) {
+							for(int j = 0; j < q.size; ++j){
+								if(strcmp(q.readyQueue[j].state, "READY")){
+									q.readyQueue[j].state = "csIn";
+									q.readyQueue[j].csT = (cS)/2;
+									break;
+								}
+							}
+							if(q.readyQueue[i].burstNum >= q.readyQueue[i].size){
+								tPs++;
+								q.readyQueue[i].state = "TERMINATED";
+							}
+							else{
+								q.readyQueue[i].state = "IO";
+							}
+						}
+					}
+				// }else if(newcsIn){
+				// 	if(strcmp(q.readyQueue[0].state, "csIn") == 0){
+				// 		if(sorting_SJF(q.readyQueue[0], q.readyQueue[i]) == 1){
+				// 			q.readyQueue[0].state = "READY";
+				// 			q.readyQueue[i].state = "csIn";
+				// 			q.readyQueue[0].turnT-= (cS/2);
+				// 			q.readyQueue[i].csT = q.readyQueue[0].csT;
+				// 			struct process p = q.readyQueue[i];
+				// 			for(int j = i; j > 0; --j){
+				// 				q.readyQueue[j] = q.readyQueue[j-1];
+				// 			}
+				// 			q.readyQueue[0] = p;
+				// 		}
+				// 	}else if(strcmp(q.readyQueue[1].state, "csIn") == 0){
+				// 		if(sorting_SJF(q.readyQueue[1], q.readyQueue[i]) == 1){
+				// 			q.readyQueue[1].state = "READY";
+				// 			q.readyQueue[i].state = "csIn";
+				// 			q.readyQueue[1].turnT-= (cS/2);
+				// 			q.readyQueue[i].csT = q.readyQueue[1].csT;
+				// 			struct process p = q.readyQueue[i];
+				// 			for(int j = i; j > 1; --j){
+				// 				q.readyQueue[j] = q.readyQueue[j-1];
+				// 			}
+				// 			q.readyQueue[1] = p;
+				// 		}
+				// 	}
+				// }
 			}
 		}
+		}
+		reorganizeQ(&q, 0);
 		reorganizeQ(&q, 1);
 
 		if(tPs >= nP){
@@ -766,6 +824,22 @@ void SJF(struct process* pA, int nP, int cS, double alpha)
 		}
 		time++;
 	}
+
+	float avgCPUb = (float)cpuUtilization/(float)totalCPU_BurstNum;
+	float avgWaitT = (float)totalWaitTime/(float)totalCPU_BurstNum;
+	float avgTurnT = (float)totalTurnt_Sum/(float)totalCPU_BurstNum;
+	float per = ((float)cpuUtilization/(float)time)*100;
+
+	struct sim s;
+	s.avg_CPUbt = avgCPUb;
+	s.avg_Wt = avgWaitT;
+	s.avg_Tt = avgTurnT;
+	s.numOfCS = contextSwitches;
+	s.numOfPre = 0;
+	s.cpuUsePer = per;
+
+	return s;
+
 
 }
 
@@ -804,39 +878,48 @@ void popQ(struct queue * q, int index)
 	q->size--;
 }
 
-//removes and returns first item in the Queue
-struct process frontQ(struct queue * q){
-		struct process p = q->readyQueue[0];
-		for(int i = 0; i < q->size-1; ++i){
-			q->readyQueue[i] = q->readyQueue[i+1];
-		}
-		return p;
-}
 
 //inserts p into queue at index i
 void insertQ(struct queue * q, struct process p){
+	// printf("%c - %d\t%c - %d", p.id, p.tau, q->readyQueue[q->size-1].id, q->readyQueue[q->size-1].tau);
 	if(q->size == 0){
 		pushQ(q, p);
-	}else{
+	}
+	// else if(p.tau >= q->readyQueue[q->size-1].tau){
+	// 	pushQ(q, p);
+	// }
+	else{
 		for(int i = 0; i < q->size; ++i){
-			if(p.tau > q->readyQueue[i].tau){
-				for(int k = q->size; k >= i; --k){
-					q->readyQueue[k] = q->readyQueue[k-1];
+			if(sorting_SJF(p, q->readyQueue[i]) == 0){
+				for(int j = q->size; j > i; --j){
+					q->readyQueue[j] = q->readyQueue[j-1];
 				}
 				q->readyQueue[i] = p;
+				q->size++;
+				return;
+			}
+		}
+		pushQ(q, p);
+	}
+}
 
-				break;
+void tie_breaker(struct queue * q){
+	for(int i = 0; i < q->size-1; i++){
+		if(q->readyQueue[i].tau == q->readyQueue[i+1].tau){
+			if(q->readyQueue[i].id > q->readyQueue[i+1].id){
+				struct process temp = q->readyQueue[i+1];
+				q->readyQueue[i+1] = q->readyQueue[i];
+				q->readyQueue[i] = temp;
 			}
 		}
 	}
-	q->size++;
 }
 
 
 
 //calculates tau_(i+1)
 int exp_avg(int tau, int t, double alpha){
-		return ceil((tau*alpha) + (t*(1-alpha)));
+		return ceil((t*alpha) + (tau*(1-alpha)));
 }
 
 //Compares two processes based on their states,
@@ -889,6 +972,12 @@ int sortingP(struct process p1, struct process p2)
 	return 0;
 }
 
+int sorting_SJF(struct process p1, struct process p2){
+	if(p1.tau > p2.tau) return 1;
+	else if(p1.tau == p2.tau && p1.id > p2.id) return 1;
+	else return 0;
+}
+
 //Reorganizes a Queue based on the current alg, before reorganizing READY and IO sections of theb Queue to fix ties
 //alg: 0 = FCFS, 1 = SJF, 2 = SRT, 3 = RR
 void reorganizeQ(struct queue * q, int alg)
@@ -916,15 +1005,42 @@ void reorganizeQ(struct queue * q, int alg)
 
 	if(alg == 1)
 	{
-		for(int i = 0; i < q->size-1; ++i){
-			struct process a = q->readyQueue[i];
-			struct process b = q->readyQueue[i+1];
-			if(a.tau == b.tau && (int)a.id > (int)b.id){
-				struct process temp = b;
-				q->readyQueue[i+1] = q->readyQueue[i];
-				q->readyQueue[i] = temp;
+			for (int i = 0; i < q->size; ++i)
+			{
+				struct process p = q->readyQueue[i];
+				int index = i;
+
+				for (int j = i; j < q->size; ++j)
+				{
+					if(strcmp(q->readyQueue[j].state, "READY") == 0 && strcmp(p.state, "READY") == 0){
+						if (sorting_SJF(p, q->readyQueue[j]) == 1)
+						{
+							q->readyQueue[index] = q->readyQueue[j];
+							q->readyQueue[j] = p;
+							index = j;
+							//break;
+						}
+					}
+
+				}
 			}
+			// if(strcmp(q->readyQueue[i].state, "READY") == 0 && strcmp(q->readyQueue[i+1].state, "READY") == 0){
+			// 	if(sorting_SJF(q->readyQueue[i], q->readyQueue[i+1])){
+			//
+			// 	}
+			// }
+			// 	if(q->readyQueue[i].tau > q->readyQueue[i+1].tau){
+			// 		struct process temp = q->readyQueue[i+1];
+			// 		q->readyQueue[i+1] = q->readyQueue[i];
+			// 		q->readyQueue[i] = temp;
+			// 	}
+			// 	if(q->readyQueue[i].tau == q->readyQueue[i+1].tau){
+			// 		if(q->readyQueue[i].id > q->readyQueue[i+1].id){
+			// 			struct process temp = q->readyQueue[i+1];
+			// 			q->readyQueue[i+1] = q->readyQueue[i];
+			// 			q->readyQueue[i] = temp;
+			// 		}
+			// 	}
+			// }
 		}
 	}
-
-}

@@ -21,7 +21,7 @@ int main() {
 			printf("Waitpid failed");
 			return EXIT_FAILURE;
 		}
-			
+
 		p = fork();
 		if(p == -1){
 			printf("Fork 2 failed");
@@ -48,5 +48,3 @@ int main() {
 	}
 
 }
-
-
