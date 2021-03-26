@@ -581,7 +581,7 @@ struct sim SJF(struct process* pA, int nP, int cS, double alpha)
 	int tPs = 0;
 	int time = 0;
 	bool cpuInUse = false;
-	//bool newcsIn = false;
+	bool newcsIn = false;
 	int totalCPU_BurstNum = 0;
 	int totalTurnt_Sum = 0;
 	int totalWaitTime = 0;
@@ -608,7 +608,7 @@ struct sim SJF(struct process* pA, int nP, int cS, double alpha)
 	// while(time < 10000){
 	while(tPs < nP){
 		//checking if new processes have arrived
-		//newcsIn = false;
+		newcsIn = false;
 		struct queue rQ;
 		rQ.size = 0;
 		for(int i = 0; i < q.size; ++i){
@@ -641,9 +641,30 @@ struct sim SJF(struct process* pA, int nP, int cS, double alpha)
 			}
 
 			if(time > 0){
+				if(strcmp(q.readyQueue[i].state, "csOut") == 0){
+					q.readyQueue[i].csT--;
 
+					if((cS/2) < q.readyQueue[i].csT){
+						tPs++;
+						if(tPs == nP && q.readyQueue[i].burstNum >= q.readyQueue[i].size) {
+							break;
+						}else{
+							tPs--;
+						}
+					}
 
-				if(strcmp(q.readyQueue[i].state, "CPU") == 0){
+					if(q.readyQueue[i].csT <= 0) {
+						if(q.readyQueue[i].burstNum >= q.readyQueue[i].size){
+							tPs++;
+							q.readyQueue[i].state = "TERMINATED";
+						}
+						else{
+							q.readyQueue[i].state = "IO";
+						}
+					}
+				}
+
+				else if(strcmp(q.readyQueue[i].state, "CPU") == 0){
 					q.readyQueue[i].cpuB--;
 					q.readyQueue[i].turnT++;
 					cpuUtilization++;
@@ -711,7 +732,7 @@ struct sim SJF(struct process* pA, int nP, int cS, double alpha)
 
 					if(!cpuInUse){
 						q.readyQueue[i].state = "csIn";
-						//newcsIn = true;
+						newcsIn = true;
 						if(i == 0){
 							q.readyQueue[i].csT = (cS/2);
 						}else{
@@ -741,7 +762,7 @@ struct sim SJF(struct process* pA, int nP, int cS, double alpha)
 						q.readyQueue[i].state = "READY";
 						if(!cpuInUse){
 							q.readyQueue[i].state = "csIn";
-							//newcsIn = true;
+							newcsIn = true;
 							if(rQ.size == 1 && strcmp(q.readyQueue[0].state, "csOut") != 0){
 								q.readyQueue[i].csT = (cS/2);
 							}else{
@@ -752,36 +773,6 @@ struct sim SJF(struct process* pA, int nP, int cS, double alpha)
 							contextSwitches++;
 							q.readyQueue[i].turnT += (cS/2);
 							popQ(&rQ, 0);
-						}
-					}
-					else if(strcmp(q.readyQueue[i].state, "csOut") == 0){
-						printf("inside csOut\n");
-						q.readyQueue[i].csT--;
-
-						if((cS/2) < q.readyQueue[i].csT){
-							tPs++;
-							if(tPs == nP && q.readyQueue[i].burstNum >= q.readyQueue[i].size) {
-								break;
-							}else{
-								tPs--;
-							}
-						}
-
-						if(q.readyQueue[i].csT <= 0) {
-							for(int j = 0; j < q.size; ++j){
-								if(strcmp(q.readyQueue[j].state, "READY")){
-									q.readyQueue[j].state = "csIn";
-									q.readyQueue[j].csT = (cS)/2;
-									break;
-								}
-							}
-							if(q.readyQueue[i].burstNum >= q.readyQueue[i].size){
-								tPs++;
-								q.readyQueue[i].state = "TERMINATED";
-							}
-							else{
-								q.readyQueue[i].state = "IO";
-							}
 						}
 					}
 				// }else if(newcsIn){
@@ -812,7 +803,6 @@ struct sim SJF(struct process* pA, int nP, int cS, double alpha)
 				// 	}
 				// }
 			}
-		}
 		}
 		reorganizeQ(&q, 0);
 		reorganizeQ(&q, 1);
